@@ -8,6 +8,36 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_redux_todo/model/model.dart';
 import 'package:flutter_redux_todo/redux/actions.dart';
 
+List<Middleware<AppState>> appStateMiddleware(
+    [AppState state = const AppState(items: [])]) {
+  final loadItems = _loadFromPrefs(state);
+  final saveItems = _saveToPrefs(state);
+
+  return [
+    TypedMiddleware<AppState, AddItemAction>(saveItems),
+    TypedMiddleware<AppState, RemoveItemAction>(saveItems),
+    TypedMiddleware<AppState, RemoveItemsAction>(saveItems),
+    TypedMiddleware<AppState, GetItemsAction>(loadItems),
+  ];
+}
+
+Middleware<AppState> _loadFromPrefs(AppState state) {
+  return (Store<AppState> store, action, NextDispatcher next) {
+    next(action);
+
+    loadFromPrefs()
+        .then((state) => store.dispatch(LoadedItemsAction(state.items)));
+  };
+}
+
+Middleware<AppState> _saveToPrefs(AppState state) {
+  return (Store<AppState> store, action, NextDispatcher next) {
+    next(action);
+
+    saveToPrefs(store.state);
+  };
+}
+
 void saveToPrefs(AppState state) async {
   SharedPreferences preferences = await SharedPreferences.getInstance();
   var string = json.encode(state.toJson());
@@ -22,20 +52,4 @@ Future<AppState> loadFromPrefs() async {
     return AppState.fromJson(map);
   }
   return AppState.initialState();
-}
-
-void appStateMiddleware(
-    Store<AppState> store, action, NextDispatcher next) async {
-  next(action);
-
-  if (action is AddItemAction ||
-      action is RemoveItemAction ||
-      action is RemoveItemsAction) {
-    saveToPrefs(store.state);
-  }
-
-  if (action is GetItemsAction) {
-    await loadFromPrefs()
-        .then((state) => store.dispatch(LoadedItemsAction(state.items)));
-  }
 }
